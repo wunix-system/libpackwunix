@@ -12,7 +12,7 @@ use alloc::vec::Vec;
 /// Может быть переопределен на этапе компиляции переменной окружения WSP_DEFAULT_REPO_URL.
 pub const DEFAULT_WSP_REPO: &str = match option_env!("WSP_DEFAULT_REPO_URL") {
     Some(url) => url,
-    None => "https://repo.wunix.org/system/x86_64",
+    None => "http://wunix.rusos.site/repo/system/x86_64",
 };
 
 /// Возвращает адрес системного репозитория WSP
