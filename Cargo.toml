@@ -1,0 +1,13 @@
+[package]
+name = "libpackwunix"
+version = "0.1.0"
+edition = "2024"
+authors = ["Valdis"]
+description = "Единая библиотека управления пакетами (WSP/WPM) операционной системы Wunix"
+license = "MIT"
+
+[features]
+default = ["std"]
+std = []
+
+[dependencies]
