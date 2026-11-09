@@ -12,6 +12,12 @@ use crate::manifest::{PackageManifest, PackageType};
 /// Магическая 4-байтная сигнатура контейнера: 'W', 'S', 'P', '1'
 pub const WSP_MAGIC: [u8; 4] = *b"WSP1";
 
+/// Стандартное расширение пакетов Wunix Package (.wp)
+pub const WP_EXTENSION: &str = ".wp";
+
+/// Устаревшее расширение пакетов (для обратной совместимости)
+pub const WSP_LEGACY_EXTENSION: &str = ".wsp";
+
 /// Размер бинарного заголовка контейнера (128 байт для выравнивания и резерва)
 pub const WSP_HEADER_SIZE: usize = 128;
 
@@ -216,5 +222,15 @@ impl<'a> PackageContainer<'a> {
             signature,
             payload,
         })
+    }
+
+    /// Проверяет, является ли пакет системным (для WSP)
+    pub fn is_system_package(&self) -> bool {
+        self.manifest.package_type == PackageType::System
+    }
+
+    /// Проверяет, является ли пакет прикладным (для WPM)
+    pub fn is_user_package(&self) -> bool {
+        self.manifest.package_type == PackageType::User
     }
 }

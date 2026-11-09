@@ -77,3 +77,67 @@ pub fn parse_repo_sources(content: &str) -> Result<Vec<RepoSection>, &'static st
 
     Ok(repos)
 }
+
+/// Системная конфигурация WSP из /etc/wsp/wsp.conf.
+/// Обратите внимание: адрес репозитория (repo_url) зашит в бинарник (DEFAULT_WSP_REPO)
+/// и защищен от редактирования обычными пользователями. Загрузчик limine_conf также
+/// не подлежит пользовательской настройке.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct WspConfig {
+    pub block_user_packages_on_critical: bool,
+    pub auto_audit: bool,
+    pub cache_dir: String,
+    pub backup_kernel: bool,
+}
+
+impl Default for WspConfig {
+    fn default() -> Self {
+        Self {
+            block_user_packages_on_critical: true,
+            auto_audit: true,
+            cache_dir: "/var/cache/wsp".to_string(),
+            backup_kernel: true,
+        }
+    }
+}
+
+impl WspConfig {
+    /// Разбирает файл /etc/wsp/wsp.conf
+    pub fn parse(content: &str) -> Self {
+        let mut cfg = WspConfig::default();
+
+        for line in content.lines() {
+            let trimmed = line.trim();
+            if trimmed.is_empty() || trimmed.starts_with('#') || trimmed.starts_with(';') {
+                continue;
+            }
+            if trimmed.starts_with('[') && trimmed.ends_with(']') {
+                continue;
+            }
+
+            if let Some(eq_pos) = trimmed.find('=') {
+                let key = trimmed[..eq_pos].trim();
+                let val = trimmed[eq_pos + 1..].trim().trim_matches('"').trim_matches('\'');
+
+                match key {
+                    "block_user_packages_on_critical" | "block_unsecure_apps" | "block_if_wsp_outdated" => {
+                        cfg.block_user_packages_on_critical = val.eq_ignore_ascii_case("true") || val == "1";
+                    }
+                    "auto_audit" | "auto_check" => {
+                        cfg.auto_audit = val.eq_ignore_ascii_case("true") || val == "1";
+                    }
+                    "cache_dir" => {
+                        cfg.cache_dir = val.to_string();
+                    }
+                    "backup_kernel" => {
+                        cfg.backup_kernel = val.eq_ignore_ascii_case("true") || val == "1";
+                    }
+                    // repo_url и limine_conf намеренно игнорируются для безопасности дистрибутива!
+                    _ => {}
+                }
+            }
+        }
+
+        cfg
+    }
+}
