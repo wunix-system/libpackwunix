@@ -49,3 +49,20 @@ fn test_dependency_req_parse() {
     assert_eq!(dep2.name, "nano");
     assert_eq!(dep2.req.op, CompareOp::Any);
 }
+
+#[test]
+fn test_commit_version_parse_and_compare() {
+    let v_commit1 = Version::parse("0.1-070b090").expect("Failed to parse 0.1-070b090");
+    let v_commit2 = Version::parse("0.1-b5ee4ba").expect("Failed to parse 0.1-b5ee4ba");
+    let v_base = Version::parse("0.1").expect("Failed to parse 0.1");
+
+    assert_eq!(v_commit1.major, 0);
+    assert_eq!(v_commit1.minor, 1);
+    assert_eq!(v_commit1.patch, 0);
+    assert_eq!(format!("{}", v_commit1), "0.1-070b090");
+    assert_ne!(v_commit1, v_commit2);
+    assert!(v_commit1 > v_base);
+
+    let dep = DependencyReq::parse("libwunix >= 0.1").expect("parse >= 0.1");
+    assert!(dep.req.matches(&v_commit1));
+}
