@@ -7,6 +7,7 @@
 extern crate alloc;
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
+use crate::version::Version;
 
 /// Базовый адрес системного репозитория WSP по умолчанию.
 /// Может быть переопределен на этапе компиляции переменной окружения WSP_DEFAULT_REPO_URL.
@@ -140,4 +141,125 @@ impl WspConfig {
 
         cfg
     }
+}
+
+/// Описание пакета в репозитории (индекс packages.json).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RepoPackage {
+    pub name: String,
+    pub version: Version,
+    pub arch: String,
+    pub tier: String,
+    pub package_type: String,
+    pub description: String,
+    pub filename: String,
+    pub size: u64,
+    pub sha256: String,
+}
+
+/// Разбирает индекс пакетов репозитория packages.json
+pub fn parse_repo_index(json_str: &str) -> Vec<RepoPackage> {
+    let mut packages = Vec::new();
+    let mut cur_name = String::new();
+    let mut cur_version = Version::new(1, 0, 0);
+    let mut cur_arch = "x86_64".to_string();
+    let mut cur_tier = "base".to_string();
+    let mut cur_type = "system".to_string();
+    let mut cur_desc = String::new();
+    let mut cur_filename = String::new();
+    let mut cur_size = 0u64;
+    let mut cur_sha256 = String::new();
+
+    for line in json_str.lines() {
+        let trimmed = line.trim().trim_end_matches(',');
+        if trimmed.starts_with("\"name\":") {
+            if let Some(v) = extract_json_str(trimmed) {
+                cur_name = v;
+            }
+        } else if trimmed.starts_with("\"version\":") {
+            if let Some(v) = extract_json_str(trimmed) {
+                if let Ok(ver) = Version::parse(&v) {
+                    cur_version = ver;
+                }
+            }
+        } else if trimmed.starts_with("\"arch\":") {
+            if let Some(v) = extract_json_str(trimmed) {
+                cur_arch = v;
+            }
+        } else if trimmed.starts_with("\"tier\":") {
+            if let Some(v) = extract_json_str(trimmed) {
+                cur_tier = v;
+            }
+        } else if trimmed.starts_with("\"type\":") {
+            if let Some(v) = extract_json_str(trimmed) {
+                cur_type = v;
+            }
+        } else if trimmed.starts_with("\"description\":") {
+            if let Some(v) = extract_json_str(trimmed) {
+                cur_desc = v;
+            }
+        } else if trimmed.starts_with("\"filename\":") {
+            if let Some(v) = extract_json_str(trimmed) {
+                cur_filename = v;
+            }
+        } else if trimmed.starts_with("\"size\":") {
+            if let Some(v) = extract_json_num(trimmed) {
+                cur_size = v;
+            }
+        } else if trimmed.starts_with("\"sha256\":") {
+            if let Some(v) = extract_json_str(trimmed) {
+                cur_sha256 = v;
+            }
+        } else if trimmed == "}" || trimmed == "}," {
+            if !cur_name.is_empty() {
+                packages.push(RepoPackage {
+                    name: cur_name.clone(),
+                    version: cur_version,
+                    arch: cur_arch.clone(),
+                    tier: cur_tier.clone(),
+                    package_type: cur_type.clone(),
+                    description: cur_desc.clone(),
+                    filename: cur_filename.clone(),
+                    size: cur_size,
+                    sha256: cur_sha256.clone(),
+                });
+                cur_name.clear();
+                cur_version = Version::new(1, 0, 0);
+                cur_arch = "x86_64".to_string();
+                cur_tier = "base".to_string();
+                cur_type = "system".to_string();
+                cur_desc.clear();
+                cur_filename.clear();
+                cur_size = 0;
+                cur_sha256.clear();
+            }
+        }
+    }
+
+    packages
+}
+
+fn extract_json_str(line: &str) -> Option<String> {
+    let mut quotes = Vec::new();
+    for (i, b) in line.bytes().enumerate() {
+        if b == b'"' {
+            quotes.push(i);
+        }
+    }
+    if quotes.len() >= 4 {
+        let start = quotes[2] + 1;
+        let end = quotes[3];
+        if end >= start {
+            return Some(line[start..end].to_string());
+        }
+    }
+    None
+}
+
+fn extract_json_num(line: &str) -> Option<u64> {
+    if let Some(colon) = line.find(':') {
+        let val_part = line[colon + 1..].trim().trim_end_matches(',').trim();
+        return val_part.parse::<u64>().ok();
+    }
+    None
 }
