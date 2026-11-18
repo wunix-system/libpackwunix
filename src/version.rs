@@ -100,6 +100,24 @@ impl Version {
             has_patch,
         })
     }
+
+    /// Проверяет, является ли версия кандидата (self) более новой или обновлением для установленной версии
+    pub fn is_newer_than(&self, installed: &Self) -> bool {
+        if self == installed {
+            return false;
+        }
+        // Переход с legacy 1.0.x или дефолтной базы 0.1.0 на коммит-версию 0.1-<commit>
+        if installed.major > 0 || (installed.patch == 0 && installed.tag_len == 0 && self.tag_len > 0) {
+            return true;
+        }
+        if self > installed {
+            return true;
+        }
+        if self.major == installed.major && self.minor == installed.minor && self.tag_slice() != installed.tag_slice() {
+            return true;
+        }
+        false
+    }
 }
 
 impl fmt::Display for Version {
