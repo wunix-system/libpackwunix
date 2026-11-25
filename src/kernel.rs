@@ -27,6 +27,8 @@ pub fn generate_limine_conf(
 
     out.push_str(&format!("timeout: {}\n", timeout_seconds));
     out.push_str("default_entry: 1\n");
+    out.push_str("quiet: yes\n");
+    out.push_str("interface_branding: Wunix OS\n");
     out.push_str("serial: yes\n\n");
 
     // Основное (текущее) ядро
@@ -44,4 +46,22 @@ pub fn generate_limine_conf(
     }
 
     out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_generate_limine_conf_is_quiet_and_branded() {
+        let cur = KernelEntry {
+            version: Version::new(0, 1, 0),
+            kernel_path: String::from("boot():/boot/wunix-kernel"),
+            cmdline: String::from("root=/dev/vda3 lang=ru mode=disk"),
+        };
+        let conf = generate_limine_conf(&cur, None, 0);
+        assert!(conf.contains("quiet: yes"));
+        assert!(conf.contains("interface_branding: Wunix OS"));
+        assert!(conf.contains("kernel_path: boot():/boot/wunix-kernel"));
+    }
 }
