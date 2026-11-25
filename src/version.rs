@@ -106,17 +106,30 @@ impl Version {
         if self == installed {
             return false;
         }
-        // Переход с legacy 1.0.x или дефолтной базы 0.1.0 на коммит-версию 0.1-<commit>
-        if installed.major > 0 || (installed.patch == 0 && installed.tag_len == 0 && self.tag_len > 0) {
+        // Миграция со старых пакетов 1.0.x на динамическую ветку 0.1.x-<commit>,
+        // не затрагивая стороннее ПО с собственным мажором (openssl 3.x, nano 7.x и т.д.).
+        if installed.major == 1
+            && installed.minor == 0
+            && installed.tag_len == 0
+            && self.major == 0
+            && self.tag_len > 0
+        {
             return true;
         }
-        if self > installed {
+
+        let self_tuple = (self.major, self.minor, self.patch);
+        let inst_tuple = (installed.major, installed.minor, installed.patch);
+        if self_tuple != inst_tuple {
+            return self_tuple > inst_tuple;
+        }
+
+        // При равных major.minor.patch переход с бестеговой базы на сборку с тегом
+        // или с чистого коммита на локальную dirty-сборку считается обновлением;
+        // произвольные разные коммит-хэши при том же patch не перетирают друг друга.
+        if installed.tag_len == 0 && self.tag_len > 0 {
             return true;
         }
-        if self.major == installed.major && self.minor == installed.minor && self.tag_slice() != installed.tag_slice() {
-            return true;
-        }
-        false
+        self.tag_slice().ends_with(b"-dirty") && !installed.tag_slice().ends_with(b"-dirty")
     }
 }
 
