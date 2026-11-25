@@ -1,0 +1,17 @@
+[package]
+name = "libpackwunix"
+version = "auto"
+arch = "x86_64"
+type = "system"
+tier = "critical"
+description = "Системная библиотека управления пакетами Wunix Package (.wp)"
+maintainer = "Wunix Core Team <dev@wunix.org>"
+
+[dependencies]
+required = ["libwunix >= 0.1"]
+conflicts = []
+replaces = []
+
+[build]
+version_source = "git:wunix/libs/libpackwunix"
+kind = "libpackwunix"

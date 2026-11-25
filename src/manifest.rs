@@ -81,6 +81,7 @@ pub struct PackageManifest {
     pub arch: String,
     pub package_type: PackageType,
     pub tier: PackageTier,
+    pub is_meta: bool,
     pub description: String,
     pub maintainer: String,
 
@@ -186,6 +187,9 @@ impl PackageManifest {
         out.push_str(&format!("arch = \"{}\"\n", self.arch));
         out.push_str(&format!("type = \"{}\"\n", self.package_type.as_str()));
         out.push_str(&format!("tier = \"{}\"\n", self.tier.as_str()));
+        if self.is_meta {
+            out.push_str("meta = true\n");
+        }
         out.push_str(&format!("description = \"{}\"\n", self.description));
         out.push_str(&format!("maintainer = \"{}\"\n\n", self.maintainer));
 
@@ -247,6 +251,7 @@ fn assign_scalar(manifest: &mut PackageManifest, section: &str, key: &str, val: 
             "arch" => manifest.arch = val.to_string(),
             "type" => manifest.package_type = PackageType::parse(val)?,
             "tier" => manifest.tier = PackageTier::parse(val)?,
+            "meta" => manifest.is_meta = val.eq_ignore_ascii_case("true") || val == "1",
             "description" => manifest.description = val.to_string(),
             "maintainer" => manifest.maintainer = val.to_string(),
             _ => {}

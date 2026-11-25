@@ -76,3 +76,70 @@ fn test_parse_repo_index_contains_git() {
     assert_eq!(git_pkg.size, 1925203);
     assert_eq!(git_pkg.sha256, "26818a878c233c8017938d59d38d4c73a9487de474834f09fe6a60c6221ed503");
 }
+
+#[test]
+fn test_repo_sources_ignores_system_section() {
+    let raw = r#"
+[system]
+Server = http://evil.example.com/system
+
+[SYSTEM]
+Server = http://evil2.example.com/system
+
+[apps]
+Server = http://wunix.rusos.site/repo/apps/x86_64
+"#;
+    let repos = parse_repo_sources(raw).expect("Failed to parse sources");
+    assert_eq!(repos.len(), 1);
+    assert_eq!(repos[0].name, "apps");
+    assert_eq!(repos[0].servers[0], "http://wunix.rusos.site/repo/apps/x86_64");
+}
+
+#[test]
+fn test_parse_repo_index_with_meta_and_dependencies() {
+    let raw = r#"{
+  "repository": "system",
+  "arch": "x86_64",
+  "packages": [
+    {
+      "name": "base",
+      "version": "0.1-1234abc",
+      "arch": "x86_64",
+      "tier": "base",
+      "type": "system",
+      "meta": true,
+      "dependencies": [
+        "wunix-base",
+        "coreutils"
+      ],
+      "description": "Metapackage",
+      "filename": "base-0.1-1234abc.wp",
+      "size": 512,
+      "sha256": "deadbeef"
+    },
+    {
+      "name": "curl",
+      "version": "0.1-1234abc",
+      "arch": "x86_64",
+      "tier": "optional",
+      "type": "user",
+      "meta": false,
+      "dependencies": ["libcwunix >= 0.1", "openssl >= 3.4.0"],
+      "description": "HTTP client",
+      "filename": "curl-0.1-1234abc.wp",
+      "size": 1024,
+      "sha256": "cafebabe"
+    }
+  ]
+}"#;
+    let pkgs = parse_repo_index(raw);
+    assert_eq!(pkgs.len(), 2);
+
+    assert_eq!(pkgs[0].name, "base");
+    assert!(pkgs[0].is_meta);
+    assert_eq!(pkgs[0].dependencies, vec!["wunix-base", "coreutils"]);
+
+    assert_eq!(pkgs[1].name, "curl");
+    assert!(!pkgs[1].is_meta);
+    assert_eq!(pkgs[1].dependencies, vec!["libcwunix >= 0.1", "openssl >= 3.4.0"]);
+}

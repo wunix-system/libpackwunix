@@ -66,4 +66,36 @@ fn test_manifest_serialize_roundtrip() {
     assert_eq!(manifest.tier, manifest2.tier);
     assert_eq!(manifest.required_deps, manifest2.required_deps);
     assert_eq!(manifest.post_install, manifest2.post_install);
+    assert_eq!(manifest.is_meta, manifest2.is_meta);
+}
+
+#[test]
+fn test_parse_metapackage_manifest_and_ignore_build_section() {
+    let raw = r#"
+[package]
+name = "base"
+version = "0.1-abc1234"
+arch = "x86_64"
+type = "system"
+tier = "base"
+meta = true
+description = "Метапакет базовой системы Wunix"
+
+[dependencies]
+required = ["wunix-base", "coreutils", "netutils"]
+
+[build]
+version_source = "git:programs"
+bins = ["should-be-ignored"]
+"#;
+    let m = PackageManifest::parse(raw).expect("Should parse metapackage manifest");
+    assert_eq!(m.name, "base");
+    assert!(m.is_meta);
+    assert_eq!(m.package_type, PackageType::System);
+    assert_eq!(m.required_deps.len(), 3);
+
+    let serialized = m.to_toml_string();
+    assert!(serialized.contains("meta = true"));
+    let m2 = PackageManifest::parse(&serialized).expect("Roundtrip meta manifest");
+    assert!(m2.is_meta);
 }

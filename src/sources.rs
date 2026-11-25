@@ -37,6 +37,7 @@ pub struct RepoSection {
 pub fn parse_repo_sources(content: &str) -> Result<Vec<RepoSection>, &'static str> {
     let mut repos: Vec<RepoSection> = Vec::new();
     let mut current_repo: Option<RepoSection> = None;
+    let mut ignore_section = false;
 
     for line in content.lines() {
         let trimmed = line.trim();
@@ -51,11 +52,21 @@ pub fn parse_repo_sources(content: &str) -> Result<Vec<RepoSection>, &'static st
             if let Some(r) = current_repo.take() {
                 repos.push(r);
             }
-            let name = &trimmed[1..trimmed.len() - 1].trim();
+            let name = trimmed[1..trimmed.len() - 1].trim();
+            // Системный источник защищен на уровне бинарника wpm и не может быть переопределен конфигом
+            if name.eq_ignore_ascii_case("system") {
+                ignore_section = true;
+                continue;
+            }
+            ignore_section = false;
             current_repo = Some(RepoSection {
                 name: name.to_string(),
                 servers: Vec::new(),
             });
+            continue;
+        }
+
+        if ignore_section {
             continue;
         }
 
@@ -151,6 +162,8 @@ pub struct RepoPackage {
     pub arch: String,
     pub tier: String,
     pub package_type: String,
+    pub is_meta: bool,
+    pub dependencies: Vec<String>,
     pub description: String,
     pub filename: String,
     pub size: u64,
@@ -165,6 +178,9 @@ pub fn parse_repo_index(json_str: &str) -> Vec<RepoPackage> {
     let mut cur_arch = "x86_64".to_string();
     let mut cur_tier = "base".to_string();
     let mut cur_type = "system".to_string();
+    let mut cur_meta = false;
+    let mut cur_deps: Vec<String> = Vec::new();
+    let mut in_deps_array = false;
     let mut cur_desc = String::new();
     let mut cur_filename = String::new();
     let mut cur_size = 0u64;
@@ -172,6 +188,14 @@ pub fn parse_repo_index(json_str: &str) -> Vec<RepoPackage> {
 
     for line in json_str.lines() {
         let trimmed = line.trim().trim_end_matches(',');
+        if in_deps_array {
+            if trimmed == "]" {
+                in_deps_array = false;
+            } else {
+                extract_json_array_strings(trimmed, &mut cur_deps);
+            }
+            continue;
+        }
         if trimmed.starts_with("\"name\":") {
             if let Some(v) = extract_json_str(trimmed) {
                 cur_name = v;
@@ -193,6 +217,19 @@ pub fn parse_repo_index(json_str: &str) -> Vec<RepoPackage> {
         } else if trimmed.starts_with("\"type\":") {
             if let Some(v) = extract_json_str(trimmed) {
                 cur_type = v;
+            }
+        } else if trimmed.starts_with("\"meta\":") {
+            if let Some(colon) = trimmed.find(':') {
+                let v = trimmed[colon + 1..].trim();
+                cur_meta = v == "true";
+            }
+        } else if trimmed.starts_with("\"dependencies\":") {
+            if let Some(bracket) = trimmed.find('[') {
+                let rest = &trimmed[bracket + 1..];
+                extract_json_array_strings(rest, &mut cur_deps);
+                if !rest.contains(']') {
+                    in_deps_array = true;
+                }
             }
         } else if trimmed.starts_with("\"description\":") {
             if let Some(v) = extract_json_str(trimmed) {
@@ -218,6 +255,8 @@ pub fn parse_repo_index(json_str: &str) -> Vec<RepoPackage> {
                     arch: cur_arch.clone(),
                     tier: cur_tier.clone(),
                     package_type: cur_type.clone(),
+                    is_meta: cur_meta,
+                    dependencies: cur_deps.clone(),
                     description: cur_desc.clone(),
                     filename: cur_filename.clone(),
                     size: cur_size,
@@ -228,6 +267,8 @@ pub fn parse_repo_index(json_str: &str) -> Vec<RepoPackage> {
                 cur_arch = "x86_64".to_string();
                 cur_tier = "base".to_string();
                 cur_type = "system".to_string();
+                cur_meta = false;
+                cur_deps.clear();
                 cur_desc.clear();
                 cur_filename.clear();
                 cur_size = 0;
@@ -237,6 +278,24 @@ pub fn parse_repo_index(json_str: &str) -> Vec<RepoPackage> {
     }
 
     packages
+}
+
+fn extract_json_array_strings(s: &str, out: &mut Vec<String>) {
+    let mut in_str = false;
+    let mut start = 0;
+    for (i, b) in s.bytes().enumerate() {
+        if b == b'"' {
+            if !in_str {
+                in_str = true;
+                start = i + 1;
+            } else {
+                in_str = false;
+                if i >= start {
+                    out.push(s[start..i].to_string());
+                }
+            }
+        }
+    }
 }
 
 fn extract_json_str(line: &str) -> Option<String> {
